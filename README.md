@@ -1,2 +1,2 @@
 # USAanalyys
-USA investeerimisfondide analüüs
+USA investeerimisfondide analüüs, Mutualfunds andmestiku ei saanud lisada, see oli liiga suur.
