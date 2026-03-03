@@ -1,0 +1,572 @@
+---
+title: "USA investeermisfondide analüüs"
+author: "Robert Lee, Mart-Andreas Rootalu"
+date: "2025-10-27"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Sissejuhatus
+
+Meie otsustasime oma projekti teha USA investeerimisfondide kohta, kus võrdleme börsil kaubaldavaid fonde ja klassikalisi investeermisfonde. Uurime, kas ETF-d või investeerimisfondid on olnud aja jooksul keskmiselt edukamad, kuidas on erinevad finantsnäitajad omavahel seotud, kuidas on fondide loomine ajas muutunud, mis fondid on ajaloo jooksul olnud kõige edukamad ja kas riskitase mõjutab fondide tootlust. 
+
+Valisime sellise teema sellepärast, et oleme mõlemad aktiivsed investeerijad, aga tavaliselt eelistame üksikuid aktsiaid fondidele, sest meil on pigem puudulikud teadmised fondide kohta. Leidsime Kaggle-st andmestiku ja nägime selles võimalust oma teadmisi fondide kohta arendada.
+
+## Börsil kaubeldavate fondide ja investeermisfondide vahe
+
+Kuna otsustasime võrrelda mõlemaid fonde on meie arvaets oluline, et oleks välja toodud, mis on bõrsil kaubeldavate fondide ja investeerimisfondide vahe. Börsil kaubeldavad fondid (Exchange Traded Funds, ETF-id) ja investeerimisfondid (mutual fundid) on mõlemad kollektiivse investeerimise vahendid, mis koondavad paljude investorite kapitali ning investeerivad selle mitmekesisesse väärtpaberite portfelli. Kuigi nende eesmärk on sarnane, erinevad nad oluliselt oma struktuuri, kauplemisviisi ja kulude poolest.
+
+ETF on börsil noteeritud fond, mille osakutega saab kaubelda reaalajas nagu aktsiatega. ETF-id on tavaliselt passiivselt juhitud, järgides mõnda turuindeksit (nt S&P 500), mis võimaldab hoida halduskulud madalal. Nende osakute hind muutub päeva jooksul vastavalt turuolukorrale ning võib veidi erineda fondi puhasväärtusest (Net Asset Value, NAV). Lisaks on ETF-id maksuefektiivsemad, kuna nende struktuur võimaldab vähendada kapitalitulu realiseerimist.
+
+Investeermisfondide osakutega seevastu ei kaubelda börsil – neid saab osta ja müüa ainult fondihalduri kaudu päeva lõpus, kui arvutatakse fondi NAV. Need fondid on sageli aktiivselt juhitud, mis tähendab, et fondijuhid teevad investeerimisotsuseid eesmärgiga ületada turu keskmist tootlust. Aktiivne juhtimine toob aga kaasa kõrgemad halduskulud ja väiksema maksuefektiivsuse.
+
+Kokkuvõtlikult võib öelda, et ETF-id sobivad investoritele, kes eelistavad madalamaid kulusid ja suuremat likviidsust, samas kui investeerimisfondid on sobivamad pikaajalistele investoritele, kes hindavad professionaalset aktiivjuhtimist ja ei vaja igapäevast kauplemisvõimalust.
+
+
+## Uurimisküsimused
+
+Kas ETF-idel ja mutual fundidel on erinev 1-aastane keskmine tootlus?
+
+Kas kõrgem expense ratio (kulude suhe) on seotud madalama tootlusega?
+
+Kuidas on fondide loomise aastate jaotus ajas muutunud?
+
+Kas fondi suurus (total net assets) korreleerub tootlusega?
+
+Millised näitajad (nt kulud, vanus, suurus) mõjutavad 1-aastast tootlust kõige enam?
+
+Millised fondid on olnud 3/5/10 aasta lõikes kõige tulusamad?
+
+Kas fondide riskitase (volatiilsus, Sharpe’i suhe, beeta) mõjutab oluliselt nende pikaajalist tootlust?
+
+
+## Andmestiku kirjeldus
+
+Andmestik sisaldab kokku 24 821 USA investeerimisfondi (Mutual Funds) ja 1 680 börsil kaubeldavat fondi (ETFs) koos erinevate finantsnäitajatega ja üldandmetega, kuupäevast 1924-07-15 kuni 2021-11-30.
+
+Andmestik on kogutud Yahoo Finance'ist ning on kasulik finantsanalüüsiks, portfelli haldamiseks ja investeerimisstrateegiate väljatöötamiseks, võimaldades uurida nii fondide üldist statistikat kui ka nende finantsilist tulemuslikkust.
+
+
+### Kasutatud tunnused
+
+#### Põhitunnused
+
+fund_return_ytd – aasta algusest saadik kogunenud tootlus (%).
+
+fund_return_1year – 1-aastane tootlus (%).
+
+fund_return_3years – 3-aastane tootlus (%).
+
+fund_return_5years – 5-aastane tootlus (%).
+
+fund_return_10years – 10-aastane tootlus (%).
+
+fund_annual_report_net_expense_ratio – aastased kulud (%).
+
+total_net_assets – fondi koguvara (USD).
+
+inception_date – fondi loomise kuupäev.
+
+type – fondi tüüp (nt ETF või Mutual Fund).
+
+#### Riskinäitajad
+
+fund_stdev_3years – 3-aastane volatiilsus.
+
+fund_sharpe_ratio_3years – 3-aastane Sharpe’i suhe.
+
+fund_beta_3years – 3-aastane beeta.
+
+#### Kirjeldavad tunnused
+
+fund_long_name – fondi täisnimi.
+
+#### Tuletatud tunnused
+
+inception_year – loomise aasta (arvutatud inception_date põhjal).
+
+age_years – fondi vanus aastates.
+
+size – log-transformeeritud koguvara (log(total_net_assets)).
+
+#### Analüüsides kasutatud tunnuste kombinatsioonid
+
+Tootluse võrdlus: fund_return_ytd × type
+
+Kulude mõju: fund_annual_report_net_expense_ratio × fund_return_ytd
+
+Ajalugu: inception_year × type
+
+Suuruse mõju: total_net_assets × fund_return_1year
+
+Mitmefaktoriline analüüs: fund_return_1year ~ fund_annual_report_net_expense_ratio + age_years + size
+
+
+# Analüüs
+
+## 1. Kas ETF-idel ja mutual fundidel on erinev 1-aastane keskmine tootlus?
+
+Analüüsis võrdlesime ETF-ide ja tavapäraste investeerimisfondide (mutual funds) keskmist aasta algusest (YTD) arvestatud tootlust. Ajavahemik on jaanuar 2021- november 2021. Enne analüüsi eemaldasime puuduolevad väärtused, et tagada usaldusväärne statistiline hinnang. ETF-ide keskmine tootlus osutus 10,08% ja investeerimisfondide keskmine tootlus 9,36%, mis viitab ETF-ide kergele ülekaalule.
+
+Statistilise erinevuse hindamiseks kasutasime Welch’i t-testi, mis ei eelda võrdseid dispersioone kahe valimi vahel. T-testi tulemus (t = 1.84, p = 0.065) näitas, et erinevus ei ole statistiliselt oluline 5% olulisuse tasemel (p > 0.05). Usaldusintervall (-0.00046 kuni 0.0149) sisaldas nulli, mis ütleb, et ETF-ide ja investeerimisfondide keskmine tootlus ei erine oluliselt.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+
+# Laeme andmed
+library(tidyverse)
+library(data.table)
+library(ggplot2)
+library(patchwork)
+etfs_metadata <- fread("ETFs.csv") #2310
+mutualfunds_metadata <- fread("MutualFunds.csv")  #23783
+
+# Vaadame andmete struktuuri
+#str(etfs_metadata)
+#str(mutualfunds_metadata)
+
+#Kas ETF-idel ja mutual fundidel on erinev keskmine tootlus?
+
+# Tootluse veerg on "fund_return_ytd" (year-to-date tootlus)
+# Eemaldame võimalikud NA väärtused, et arvutused oleksid korrektsed
+etfs_returns <- etfs_metadata[!is.na(fund_return_ytd), fund_return_ytd]
+mutualfunds_returns <- mutualfunds_metadata[!is.na(fund_return_ytd), fund_return_ytd]
+
+# Arvutame keskmised tootlused
+mean_etf <- mean(etfs_returns)
+mean_mf <- mean(mutualfunds_returns)
+
+# Kuvame keskmised
+cat("ETF-ide keskmine YTD tootlus:", mean_etf, "\n")
+cat("Mutual fund'ide keskmine YTD tootlus:", mean_mf, "\n")
+
+# Teeme t-testi, et kontrollida, kas keskmised on statistiliselt erinevad
+#(Welch's t-test, sest kahel grupil märgatavalt erinevad suurused)
+t_test_result <- t.test(etfs_returns, mutualfunds_returns, var.equal = FALSE)
+
+# Kuvame t-testi tulemused
+print(t_test_result)
+
+
+```
+
+### Järeldus 
+
+Kuigi ETF-id näitasid veidi kõrgemat keskmist tootlust, ei olnud erinevus statistiliselt oluline. See viitab sellele, et lühiajalise (YTD) perioodi jooksul ei pruugi fonditüüp tootlust märkimisväärselt mõjutada.
+
+## 2. Kas kõrgem kulude suhe (expense ratio) on seotud madalama tootlusega?
+
+Seose hindamiseks kulude suhte (expense ratio) ja tootluse vahel arvutasime nii Pearsoni kui Spearmani korrelatsioonikordajad. Pearsoni korrelatsioon (r = 0.061) ja Spearmani korrelatsioon (p = 0.096) viitasid väga nõrgale positiivsele seosele.
+
+Tulemused näitavad, et fondidel, mille kulude suhe on kõrgem, esineb proovis veidi kõrgem tootlus, kuid seos on peaaegu olematu ning tõenäoliselt statistiliselt ebaoluline. See tulemus on vastuolus tavapärase finantsteooriaga, mille kohaselt kõrgemad kulud peaksid vähendama tootlust. Võimalik seletus on, et aktiivselt juhitud fondid (tavaliselt kõrgemate kuludega) suutsid analüüsitud perioodil saavutada keskmisest paremaid tulemusi.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+
+#Kas kõrgem expense ratio (kulude suhe) on seotud madalama tootlusega?
+
+# Lisame tüübi ja ühendame
+etfs_metadata[, type := "ETF"]
+mutualfunds_metadata[, type := "Mutual Fund"]
+combined <- rbind(etfs_metadata, mutualfunds_metadata, fill = TRUE)
+
+# Valime veerud ja eemaldame NA-d
+data_for_analysis <- combined[!is.na(fund_annual_report_net_expense_ratio) & !is.na(fund_return_ytd),
+                              .(expense_ratio = fund_annual_report_net_expense_ratio, returns = fund_return_ytd)]
+
+# Korrelatsioonid
+pearson_cor <- cor(data_for_analysis$expense_ratio, data_for_analysis$returns, method = "pearson")
+spearman_cor <- cor(data_for_analysis$expense_ratio, data_for_analysis$returns, method = "spearman")
+
+# Tulemused
+cat("Pearson korrelatsioon:", pearson_cor, "\n")
+cat("Spearman korrelatsioon:", spearman_cor, "\n")
+
+```
+
+### Järeldus 
+
+Antud valimi põhjal ei leitud olulist negatiivset seost kulude ja tootluse vahel. Pigem esines nõrk ja tõenäoliselt juhuslik positiivne seos, mis võib peegeldada aktiivsete fondide ajutist edukust.
+
+
+## 3. Kuidas on fondide loomise aastate jaotus ajas muutunud?
+
+Aastate kaupa koostatud jaotuse analüüs näitas, et nii ETF-ide kui investeerimisfondide arv on aja jooksul oluliselt kasvanud. ETF-ide osakaal on viimastel aastatel kiiresti suurenenud, eriti alates 2010. aastatest, mis peegeldab nende madalate kulude ja suurema likviidsuse tõttu kasvanud populaarsust.
+Investeerimisfondide arv seevastu on kasvanud aeglasemalt, näidates turu küllastumist ja ETF-ide konkurentsieelist. Graafiline analüüs rõhutab selgelt ETF-ide osakaalu suurenemist investeerimismaastikul.
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
+
+#Kuidas on fondide loomise aastate jaotus ajas muutunud?
+
+
+#Võtame välja aasta inception_date'st (formaadis YYYY-MM-DD)
+combined[, inception_year := as.integer(substr(inception_date, 1, 4))]
+
+# Eemaldame NA-d
+combined <- combined[!is.na(inception_year)]
+
+# Loendame aasta ja tüübi järgi
+year_counts <- combined[, .N, by = .(inception_year, type)]
+
+# Visualiseerimine: Baardiagramm aastate kaupa, eraldi tüübi järgi
+ggplot(year_counts, aes(x = inception_year, y = N, fill = type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Fondide loomise aastate jaotus", x = "Aasta", y = "Fondide arv", fill = "Fonditüüp") +
+  theme_minimal()
+
+```
+
+### Järeldus 
+
+ETF-ide levik on oluliselt kasvanud viimase kümnendi jooksul, mis näitab struktuurimuutust investeerimisturul ja investorite eelistuste muutumist madalamate kulude ning läbipaistvuse suunas.
+
+
+## 4. Kas fondi suurus (total net assets) korreleerub tootlusega?
+
+Fondi suuruse ja tootluse seost hindasime Pearsoni korrelatsiooni ning lineaarse regressiooni abil. Korrelatsioonikordaja (r = 0.0069) näitas, et on praktiliselt olematu positiivne seos. Regressioonimudel (R = 0.000047) kinnitas, et fondi suurus ei selgita tootluse varieeruvust.
+Suuruse koefitsient (0.00068, p = 0.278) ei olnud statistiliselt oluline. See tähendab, et fondi suurem varade maht ei suurenda ega vähenda oluliselt selle tootlust ühe aasta jooksul.
+
+```{r,echo=FALSE, message = FALSE, warning=FALSE}
+#Kas fondi suurus (total net assets) korreleerub tootlusega?
+
+
+# Valime veerud ja eemaldame NA-d
+data_for_analysis <- combined[!is.na(fund_return_1year) & !is.na(total_net_assets),
+                              .(return_1year = fund_return_1year, 
+                                size = log(total_net_assets))]  # Log transform suurusest normaliseerimiseks
+
+# Arvutame Pearsoni korrelatsioon
+cor_size <- cor(data_for_analysis$return_1year, data_for_analysis$size, method = "pearson")
+
+# Lineaarne regressioon: return_1year ~ size
+lm_model <- lm(return_1year ~ size, data = data_for_analysis)
+#summary(lm_model)  # Koefitsiendid, p-väärtused,
+
+# Visualiseerimine
+plot(data_for_analysis$size, data_for_analysis$return_1year, 
+     main = "Fondi suurus vs 1-aastane tootlus", 
+     xlab = "Log(Total Net Assets)", ylab = "1-aastane tootlus")
+abline(lm_model, col = "red")
+
+# Tulemused
+cat("Pearsoni korrelatsioon suurusega:", cor_size, "\n")
+#print(summary(lm_model))
+
+```
+
+### Järeldus
+
+Fondi suurus ei ole antud valimi põhjal seotud tootluse tasemega. Suured ja väikesed fondid saavutavad sarnase tootluse, mistõttu suurus ei ole määrav tegur investeeringu tulemuslikkuse seisukohalt.
+
+## 5. Millised näitajad (kulud, vanus, suurus) mõjutavad 1-aastast tootlust kõige enam?
+
+Mitme muutujaga lineaarne regressioon, milles sõltuvaks muutujaks oli 1-aastane tootlus ja sõltumatuteks muutujateks olid kulude suhe, fondi vanus ning suurus, näitas järgmisi tulemusi. Kulude suhe mõjus tootlusele positiivselt (Beeta = 2.47, p < 0.001), fondi vanus mõjus kergelt negatiivselt (Beeta = -0.00068, p < 0.001), ja fondi suurus positiivselt (Beeta = 0.0027, p < 0.001).
+
+Kuigi kõik koefitsiendid olid statistiliselt olulised, oli mudeli seletusvõime väga madal (R = 0.0048), mis tähendab, et need kolm tegurit selgitavad vaid umbes 0.48% tootluse variatsioonist. Seega on nende praktiline mõju minimaalne.
+
+```{r,echo=FALSE, message=FALSE,warning=FALSE}
+
+#Millised näitajad (nt kulud, vanus, suurus) mõjutavad 1-aastast tootlust kõige enam?
+
+
+current_date <- Sys.Date()
+combined[, inception_date := as.Date(inception_date)]
+combined[, age_years := as.numeric(difftime(current_date, inception_date, units = "days")) / 365]
+
+# Valime veerud ja eemaldame NA-d
+data_for_analysis2 <- combined[!is.na(fund_return_1year) & !is.na(fund_annual_report_net_expense_ratio) & 
+                                 !is.na(age_years) & !is.na(total_net_assets),
+                               .(return_1year = fund_return_1year, 
+                                 expense_ratio = fund_annual_report_net_expense_ratio,
+                                 age = age_years,
+                                 size = log(total_net_assets))]  # Log suurusest, et normaliseerida
+
+# Korrelatsioonid iga näitajaga
+cor_expense <- cor(data_for_analysis2$return_1year, data_for_analysis2$expense_ratio)
+cor_age <- cor(data_for_analysis2$return_1year, data_for_analysis2$age)
+cor_size2 <- cor(data_for_analysis2$return_1year, data_for_analysis2$size)
+
+# Mitme muutujaga regressioon: return_1year ~ expense + age + size
+lm_model2 <- lm(return_1year ~ expense_ratio + age + size, data = data_for_analysis2)
+#summary(lm_model2)  # Koefitsiendid, p-väärtused, R² (mõju tugevus)
+
+# Visualiseerimine (nt scatterplot expense vs return)
+plot(data_for_analysis2$expense_ratio, data_for_analysis2$return_1year, 
+     main = "Expense Ratio vs 1-Year Return", xlab = "Expense Ratio", ylab = "1-Year Return")
+abline(lm(return_1year ~ expense_ratio, data = data_for_analysis2), col = "red")
+
+# Tulemused
+cat("Korrelatsioon kuludega:", cor_expense, "\n")
+cat("Korrelatsioon vanusega:", cor_age, "\n")
+cat("Korrelatsioon suurusega:", cor_size, "\n")
+
+
+```
+
+### Järeldus
+
+Tulemused viitavad, et tootlust mõjutavad pigem turutingimused ja välised tegurid kui fondi sisemised omadused nagu kulud, vanus või suurus. Statistiliselt olulised seosed on nõrgad ja praktiliselt ebaolulised.
+
+## 6. Millised fondid on olnud 3, 5 ja 10 aasta lõikes kõige tulusamad?
+
+Analüüs näitas, et fondide tootlus varieerub märkimisväärselt sõltuvalt ajaperioodist ja fonditüübist. Kolme aasta perspektiivis olid parimad fondid valdavalt Amana Mutual Funds Trust’i ja BMO Conservative Allocation Fund’i hallatavad fondid. Kõrgeim kolmeaastane tootlus (74,2%) kuulus American Century Inflation-Adjusted Bond Fund G Class fondile, mis kuulub ETF-ide kategooriasse.
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
+
+#Parimad fondid läbi aastate
+# 3 aasta parimad fondid (top 5)
+top3 <- combined %>%
+  arrange(desc(fund_return_3years)) %>%
+  select(fund_long_name, quote_type, fund_return_3years) %>%
+  head(5)
+
+# 5 aasta parimad fondid (top 5)
+top5 <- combined %>%
+  arrange(desc(fund_return_5years)) %>%
+  select(fund_long_name, quote_type, fund_return_5years) %>%
+  head(5)
+
+# 10 aasta parimad fondid (top 5)
+top10 <- combined %>%
+  arrange(desc(fund_return_10years)) %>%
+  select(fund_long_name, quote_type, fund_return_10years) %>%
+  head(5)
+
+
+# Tulpdiagramm: TOP 10 fondi 3 aasta tootluse järgi
+
+ggplot(top3, aes(x = reorder(fund_long_name, fund_return_3years),
+                 y = fund_return_3years,
+                 fill = quote_type)) +
+  geom_col() +
+  geom_text(aes(label = round(fund_return_3years, 2)),      # kuvame tootluse, ümardatult kahe komakohani
+            hjust = -0.1,                                   # nihutab teksti veidi paremale 
+            size = 3.5) +                                   # fondi suurus
+  coord_flip() +
+  labs(
+    title = "TOP 5 fondi 3 aasta tootluse järgi",
+    x = "Fondi pikk nimi",
+    y = "3-aastane tootlus",
+    fill = "Fonditüüp"
+  ) +
+  theme_minimal() +
+  ylim(0, max(top3$fund_return_3years) * 1.1)  #jätab natuke ruumi tekstile tulba lõpus
+
+
+```
+
+Viie aasta vaates domineerisid samuti ETF-id, eriti BMO Conservative Allocation Fund Class I (89,4%) ja Brookfield Global Listed Infrastructure Fund Class A (72,9%).
+
+```{r,echo=FALSE, message=FALSE,warning=FALSE}
+# Tulpdiagramm: Top 5 fondi 5 aasta tootluse järgi
+
+ggplot(top5, aes(x = reorder(fund_long_name, fund_return_5years), y = fund_return_5years, fill = quote_type)) +
+  geom_col() +
+  geom_text(aes(label = round(fund_return_5years, 2)),      # kuvame tootluse, ümardatult kahe komakohani
+            hjust = -0.1,                                   # nihutab teksti veidi paremale 
+            size = 3.5) +                                   # fondi suurus
+  coord_flip() +
+  labs(
+    title = "TOP 5 fondi 5 aasta tootluse järgi",
+    x = "Fondi pikk nimi",
+    y = "5-aastane tootlus",
+    fill = "Fonditüüp"
+  ) +
+  theme_minimal()+
+   ylim(0, max(top5$fund_return_5years) * 1.1)  #jätab natuke ruumi tekstile tulba lõpus
+
+```
+
+Ka kümneaastase perioodi lõikes olid tipus peamiselt ETF-id, nende seas BlackRock High Yield Bond Portfolio Class R Shares (53,3%) ja BMO Conservative Allocation Fund Class I (50,4%).
+Üldine muster viitab sellele, et ETF-id on valdavalt saavutanud kõrgema tootluse pikema aja jooksul, samas kui üksikud aktiivselt juhitud investeerimisfondid, nagu Amana, on lühemas perspektiivis olnud samuti väga edukad.
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
+# Tulpdiagramm: Top 5 fondi 10 aasta tootluse järgi
+
+ggplot(top10, aes(x = reorder(fund_long_name, fund_return_10years), y = fund_return_10years, fill = quote_type)) +
+  geom_col() +
+  geom_text(aes(label = round(fund_return_10years, 2)),      # kuvame tootluse, ümardatult kahe komakohani
+            hjust = -0.1,                                   # nihutab teksti veidi paremale 
+            size = 3.5) +                                   # fondi suurus
+  coord_flip() +
+  labs(
+    title = "TOP 5 fondi 10 aasta tootluse järgi",
+    x = "Fondi pikk nimi",
+    y = "5-aastane tootlus",
+    fill = "Fonditüüp"
+  ) +
+  theme_minimal()+
+   ylim(0, max(top10$fund_return_10years) * 1.1) 
+
+```
+
+### Järeldus
+
+Pikema perioodi (5–10 aastat) jooksul on ETF-id olnud üldiselt tulusamad, aga viimase kolme aasta jooksul on olnud Amana investeerimisfondid samuti väga tulusad. See peegeldab ETF-ide efektiivsust madalate kulude ja passiivse juhtimisstrateegia tõttu.
+
+### Kõige tulusamad Fondid
+
+Me arvasime, et oleks tore ka teada millega 3, 5 ja 10 aasta kõige tulusamad fondid tegelevad, kuhu nad investeerivad ja mis on nende investeerimisstrateegiad.
+
+#### American Century Inflation-Adjusted Bond Fund 
+
+Fond keskendub inflatsiooniga kohandatud võlakirjadele ja sarnastele instrumentidele. Tavaliselt vähemalt 80% fondi varadest investeeritakse inflatsioonikohandatud võlakirjadesse või sarnastesse sissetulekuinstrumentidesse. Lisaks võib fond investeerida derivatiive (näiteks futuurid, swap-lepingud, inflatsiooniswappid), krediidiriski instrumente, teiste võlakirjade instrumente ja muid fikseeritud tulumääraga instrumendid, sõltuvalt turutingimustest. Fondi eesmärk on kaitsta ostujõudu samal ajal pakkudes fikseeritud tulu komponendiga tootlust.
+
+#### BMO Conservative Allocation Fund
+
+BMO Conservative Allocation Fundi strateegia põhineb varade jaotusel ja püüab investeerida umbes 80% fikseeritud tulumääraga väärtpaberitesse ja 20% aktsiaalternatiividesse. See fond võib investeerida ka teiste ETF-ide ja investeerimisfondide kaudu, mis tähendab, et ta kasutab alamfondide struktuuri, et hajutada riski. Fond võib liikuda ka likviidsete varade (sularaha, rahaturu instrumendid) poole kriisi või kaitseperioodidel.
+
+#### BlackRock High Yield Bond Portfolio
+
+Fond keskendub peamiselt kõrge intressiga võlakirjadele. Enamasti vähemalt 80% varadest investeeritakse sellistesse kõrge tootlusega võlakirjadesse. Fondi võlakirjad võivad olla erineva tähtajaga, aga tihti fokusseeritakse nii keskmisele kui ka lühemale tähtajale, et maandada intressimäära riski. Eesmärk on pakkuda suurt tulu, kuid sellega kaasneb kõrgem risk.
+
+#### Brookfield Global Listed Infrastructure Fund Class A 
+
+Fond investeerib peamiselt avalikult noteeritud infrastruktuuri ettevõtetesse üle maailma. Tavaliselt vähemalt 80 % fondi varadest investeeritakse infrastruktuuri aktsiatesse (aktsiad, mis tegutsevad infrastruktuuri sektoris).
+
+
+#### Amana fondid
+
+Amana fondid on üsna huvitavad, sest nad järgivad islamile vastavat investeerimispõhimõtet, mis tähendab, et nad ei investeeri ettevõtetesse ega instrumenditesse, mis tegelevad intressi teenimise, laenamise, hasartmängude, alkoholi, relvade, sealiha, kindlustuse jms-ga.
+
+##### Amana Growth Fund (AMAGX)
+
+Fond investeerib peamiselt aktsiatesse, sealhulgas välismaistesse ettevõtetesse. Fond järgib suur- ja keskmise kapitalisatsiooni strateegiaid, valides ettevõtteid, mis vastavad fundamentaalsetele, eetilistele ja finantskriteeriumidele (vähene võlg, stabiilsed tulud, eetiline äri).
+
+
+##### Amana Income Fund (AMANX)
+
+Investeerib peamiselt dividendi maksevatesse aktsiatesse ning keskendub kapitali säilitamisele ja sissetuleku tootmisele. Fondi investeerimisestrateegiaks on see, et vähemalt 80 % varadest investeeritakse tulu tootvatesse aktsiatesse.
+
+##### Amana Participation Fund (AMAPX)
+
+Tegemist on esimesega Amana fondiga, mis ei ole aktsiapõhine, vaid investeerib sukuk-i (islamipõhine võlakiri) ja teistesse islamipõhistesse tuluinstrumentidesse. Keskendub kapitali säilitamisele ja jooksvale tulule.
+
+#### Direxion Monthly NASDAQ-100 Bull 2X Fund
+
+Aktiivselt juhitud fond, mis püüab kahekordistada NASDAQ-100 indeksi tootlust. Väga kõrge risk ja volatiilsus ja sobib pigem lühiajaliseks kauplemiseks, mitte pikaajaliseks hoidmiseks.
+
+#### BMO Global Low Volatility Equity Fund Class A
+
+Investeerib ülemaailmsetesse madala volatiilsusega aktsiatesse, et pakkuda stabiilsemat tootlust väiksema riskiga. Eesmärk on saavutada turuga sarnane tootlus, kuid madalama kõikumisega.
+
+#### Brown Advisory Emerging Markets Select Fund Advisor Shares
+
+Keskendub arenevate turgude (nt India, Brasiilia, Taiwan, Hiina) kvaliteetsetele ettevõtetele. Valib pikaajaliselt kasumlikke ja hästi juhitud firmasid; risk on kõrgem, aga potentsiaalne tootlus samuti.
+
+#### Buffalo Growth Fund Institutional Class
+
+USA suure ja keskmise kapitalisatsiooniga kasvufond. Investeerib tugeva kasvu ja uuendusvõimega ettevõtetesse (nt tehnoloogia, tervishoid, tarbekaubad). Fookus on pikaajalisel kapitalikasvul.
+
+## 7. ETF-ide ja investeerimisfondide keskmine tootlus eri perioodidel
+
+Keskmiste tootluste võrdlus näitas, et üldiselt on investeerimisfondid näidanud kõrgemat keskmist tootlust kõigil kolmel perioodil (3, 5 ja 10 aastat), mis on näha ka allpool olevast graafilisest võrdlusest. ETF-ide keskmine 3,5, 10 aastane tootlus oli vastavalt 7.4%, 7.2% ja 3.1%, aga investeerimisfondidel 3, 5, 10 aasta keskmine tootlus 10.1%, 8.2% ja 8%.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+
+# Võrdlusgraafik: ETF vs mutual fund keskmine tootlus eri perioodidel
+kokkuvõte <- combined %>%
+  group_by(quote_type) %>%
+  summarise(
+    keskmine_3a = mean(fund_return_3years, na.rm = TRUE),
+    keskmine_5a = mean(fund_return_5years, na.rm = TRUE),
+    keskmine_10a = mean(fund_return_10years, na.rm = TRUE)
+  ) %>%
+  pivot_longer(cols = starts_with("keskmine_"), names_to = "aeg", values_to = "keskmine_tootlus")
+
+ggplot(kokkuvõte, aes(x = aeg, y = keskmine_tootlus, fill = quote_type)) +
+  geom_col(position = position_dodge(width = 0.9)) +
+  geom_text(aes(label = round(keskmine_tootlus, 4)),
+            position = position_dodge(width = 0.9),
+            vjust = -0.3,         # nihutab teksti veidi tulba kohale
+            size = 3.5) +
+  labs(
+    title = "ETF-ide ja investeerimisfondide keskmine tootlus eri perioodidel",
+    x = "Ajavahemik",
+    y = "Keskmine tootlus (%)",
+    fill = "Fonditüüp"
+  ) +
+  theme_minimal() +
+  ylim(0, max(kokkuvõte$keskmine_tootlus) * 1.1)
+
+```
+
+Tulemus võib peegeldada asjaolu, et investeerimisfondid rakendavad aktiivset juhtimisstrateegiat, mis võib teatavatel turuperioodidel (nt volatiilsematel turgudel) pakkuda paremaid tulemusi kui passiivselt juhitud ETF-id. Samas võivad need erinevused olla ajutised ning sõltuda turutsükli faasist.
+
+### Järeldus 
+
+Keskmiste tootluste võrdlus ei kinnita ETF-ide märkimisväärset paremust. Keskmise tootluse poolest näitavad investeerimisfondid antud valimis ülekaalu.
+
+## 8. Kas fondide riskitase mõjutab oluliselt nende pikaajalist tootlust?
+
+Riskinäitajate (volatiilsus, Sharpe’i suhe ja beeta) mõju fondide 5-aastasele tootlusele hindasime nii korrelatsioonide kui lineaarse regressioonimudeli abil. Korrelatsioonimaatriks näitas, et 5-aastane tootlus korreleerub kõige tugevamalt Sharpe’i suhtega (r = 0.55), millele järgnevad beeta (r = 0.35) ja volatiilsus ehk standardhälve (r = 0.22).
+
+Lineaarne regressioon kinnitas, et kõik kolm riskinäitajat on statistiliselt olulised (p < 0.001) ja mõjutavad tootlust positiivselt. Mudeli R = 0.466 tähendab, et ligikaudu 47% tootluse varieeruvusest on seletatav nende kolme riskimõõdikuga, mis viitab tugevale selgitusvõimele. Kõige suurema mõjuga oli Sharpe’i suhe (Beeta = 0.119), mis väljendab riski ja tootluse efektiivset suhet: fondid, mille risk on tasakaalus kõrgema tootlusega, saavutavad keskmiselt paremaid tulemusi.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+# Kas riskitase mõjutab volatiilisust 
+df_risk <-combined %>%
+  mutate(
+    fund_return_5years = as.numeric(fund_return_5years),
+    fund_stdev_3years = as.numeric(fund_stdev_3years),
+    fund_sharpe_ratio_3years = as.numeric(fund_sharpe_ratio_3years),
+    fund_beta_3years = as.numeric(fund_beta_3years)
+  ) %>%
+  drop_na(fund_return_5years, fund_stdev_3years, fund_sharpe_ratio_3years, fund_beta_3years)
+
+# Lihtne korrelatsioon, et näha suundumust
+cor_matrix <- df_risk %>%
+  select(fund_return_5years, fund_stdev_3years, fund_sharpe_ratio_3years, fund_beta_3years) %>%
+  cor(use = "complete.obs", method = "pearson")
+
+cor_matrix
+
+
+# Lineaarne regressioon: kas risk mõjutab pikaajalist tootlust
+model_risk <- lm(fund_return_5years ~ fund_stdev_3years + fund_sharpe_ratio_3years + fund_beta_3years, data = df_risk)
+#summary(model_risk)
+
+```
+
+Graafiline analüüs näitas, et ETF-ide puhul on Sharpe’i suhte ja 5-aastase tootluse seos märgatavalt järsem kui investeerimisfondide puhul. See viitab sellele, et ETF-ide tootlus reageerib riskitaseme muutustele tugevamalt – st kõrgema Sharpe’i suhtega ETF-id on oluliselt tulusamad kui madalama riskiga ETF-id. Investeerimisfondide puhul on see seos nõrgem, mis võib olla tingitud aktiivse juhtimise ja erinevate investeerimisstrateegiate suuremast hajuvusest.
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Graafiline kontroll: Sharpe’i suhe ja 5-aastane tootlus
+ggplot(df_risk, aes(x = fund_sharpe_ratio_3years, y = fund_return_5years, color = quote_type)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Sharpe'i suhte ja 5-aastase tootluse seos",
+    x = "Sharpe'i suhe (3a)",
+    y = "5-aastane tootlus",
+    color = "Fonditüüp"
+  ) +
+  theme_minimal()
+
+```
+
+### Järeldus 
+
+Fondide riskinäitajad mõjutavad oluliselt pikaajalist tootlust, eriti Sharpe’i suhe, mis on kõige tugevam tootlust ennustav tegur. ETF-ide puhul on riski ja tulu vaheline seos tugevam ja lineaarsem, samas kui investeerimisfondide puhul on see nõrgem ja varieeruvam.
+
+
+
+# Kokkuvõte
+
+Käesolev projekt analüüsis USA investeerimisfonde, võrreldes börsil kaubeldavaid fonde (ETF-id) ja klassikalisi investeerimisfonde (mutual funds). Uurimise eesmärk oli selgitada fonditüüpide erinevusi tootluses, kuludes, loomise dünaamikas, suuruses ja riskitasemes, kasutades Kaggle'i andmestikku perioodist 2021. aasta jaanuarist novembrini, samuti pikemaajalisi andmeid.
+
+## Peamised järeldused:
+- ETF-ide ja mutual fund'ide keskmine 1-aastane tootlus ei erine statistiliselt oluliselt (ETF-id: 10,08%; mutual fund'id: 9,36%), kuigi ETF-id näitasid kerget ülekaalu.
+- Kulude suhe (expense ratio) korreleerub tootlusega nõrgalt positiivselt, mis vastandub tavateooriale ja viitab aktiivsete fondide ajutisele edule.
+- Fondide loomine on ajas kasvanud, kusjuures ETF-ide osakaal on alates 2010. aastast järsult suurenenud, peegeldades nende populaarsust madalate kulude ja likviidsuse tõttu.
+- Fondi suurus (total net assets) ei korreleeru tootlusega, näidates, et suured ja väikesed fondid saavutavad sarnaseid tulemusi.
+- Kulud, vanus ja suurus mõjutavad 1-aastast tootlust minimaalselt (mudel seletab vaid 0,48% variatsioonist), rõhutades väliste turutegurite domineerimist.
+- Kõige tulusamad fondid 3-aasta perioodil olid American Century Inflation-Adjusted Bond Fund G Class (74,2%) ja BMO Conservative Allocation Fund Class I; 5-aasta perioodil BMO Conservative Allocation Fund Class I (89,4%); 10-aasta perioodil BlackRock High Yield Bond Portfolio Class R Shares (53,3%). Pikemas perspektiivis domineerisid ETF-id, lühemas Amana islamipõhised fondid.
+- Investeerimisfondid näitasid kõrgemat keskmist tootlust kõigil perioodidel (3a: 10,1%; 5a: 8,2%; 10a: 8%) võrreldes ETF-idega (3a: 7,4%; 5a: 7,2%; 10a: 3,1%), mis võib tuleneda aktiivsest juhtimisest volatiilsetel turgudel.
+- Riskinäitajad (volatiilsus, Sharpe'i suhe, beeta) mõjutavad pikaajalist tootlust oluliselt (seletavad 47% variatsioonist), kusjuures Sharpe'i suhe on tugevaim ennustaja. ETF-ide puhul on riski ja tootluse seos järsem kui investeerimisfondidel.
+
+Üldiselt ei kinnita analüüs ETF-ide üldist paremust, vaid rõhutab, et valik sõltub investori eelistustest: ETF-id sobivad madalate kulude ja likviidsuse jaoks, investeerimisfondid aktiivse juhtimise ja potentsiaalselt kõrgema tootluse jaoks. Tulemused soovitavad investoritel arvestada turutsüklite ja riskiga, mitte ainult fonditüübiga. Projekt aitas meil tutuvuda erinevate fonditüüpidega ja saime teada, mis nende tootlust mõjutab.
+
